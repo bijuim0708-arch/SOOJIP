@@ -41,21 +41,35 @@ try {
   console.log(`  API mode        : ${health.apiMode || "-"}`);
   console.log(`  target members  : ${health.members ?? "-"}`);
   console.log(`  bill scope      : ${health.billScope || "-"}`);
+  console.log(`  proposer API    : ${health.proposerEndpoint || "-"}`);
 
   console.log("[3/3] Calling Open Assembly with issued key");
   const sync = await readJson("/api/assembly/sync?days=30");
+  const returnedBills = Array.isArray(sync.items) ? sync.items.length : 0;
   console.log(`  queried members : ${sync.queriedMembers ?? "-"}`);
   console.log(`  successful      : ${sync.successfulMembers ?? "-"}`);
-  console.log(`  returned bills  : ${Array.isArray(sync.items) ? sync.items.length : 0}`);
+  console.log(`  returned bills  : ${returnedBills}`);
+  console.log(`  proposer asked  : ${sync.proposerRequestedBills ?? "-"}`);
+  console.log(`  proposer enriched: ${sync.proposerEnrichedBills ?? "-"}`);
+  console.log(`  proposer failures: ${Array.isArray(sync.proposerLookupFailures) ? sync.proposerLookupFailures.length : "-"}`);
   console.log(`  partial failure : ${sync.partial ? "yes" : "no"}`);
   if (sync.failedMembers?.length) {
     for (const failure of sync.failedMembers) {
-      console.log(`    - ${failure.memberName || failure.memberId}: ${failure.message || "failed"}`);
+      console.log(`    - member ${failure.memberName || failure.memberId}: ${failure.message || "failed"}`);
+    }
+  }
+  if (sync.proposerLookupFailures?.length) {
+    for (const failure of sync.proposerLookupFailures.slice(0, 10)) {
+      console.log(`    - proposer ${failure.billNo || failure.billId}: ${failure.message || "failed"}`);
     }
   }
 
+  if (returnedBills > 0 && Number(sync.proposerEnrichedBills || 0) === 0) {
+    throw new Error("BILLINFOPPSR proposer enrichment did not succeed for any returned bill.");
+  }
+
   console.log("");
-  console.log("[SUCCESS] Issued-key access to the Open Assembly API is working.");
+  console.log("[SUCCESS] Issued-key access and BILLINFOPPSR proposer enrichment are working.");
   console.log("API key value was not printed or saved by this diagnostic.");
 } catch (error) {
   console.error("");

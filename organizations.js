@@ -1,0 +1,26 @@
+window.SUNEUM_DATA = window.SUNEUM_DATA || {};
+window.SUNEUM_DATA.organizations = [
+  { id: "ORG-DAEGU-CITY", name: "대구광역시", type: "지방자치단체", region: "대구광역시", regionIds: ["DAEGU-METRO"], homepage: "https://www.daegu.go.kr/", verificationStatus: "공식주소확인", verifiedAt: "2026-09-02", active: true },
+  { id: "ORG-DAEGU-COUNCIL", name: "대구광역시의회", type: "지방의회", region: "대구광역시", regionIds: ["DAEGU-METRO"], homepage: "https://council.daegu.go.kr/", verificationStatus: "공식주소확인", verifiedAt: "2026-09-02", active: true },
+  { id: "ORG-JUNG-OFFICE", name: "대구광역시 중구", type: "지방자치단체", region: "대구광역시 중구", regionIds: ["DAEGU-JUNG"], homepage: "https://www.jung.daegu.kr/", verificationStatus: "공식주소확인", verifiedAt: "2026-09-02", active: true },
+  { id: "ORG-JUNG-COUNCIL", name: "대구광역시 중구의회", type: "지방의회", region: "대구광역시 중구", regionIds: ["DAEGU-JUNG"], homepage: "https://council.jung.daegu.kr/", verificationStatus: "연결전재확인", verifiedAt: "", active: true },
+  { id: "ORG-DONG-OFFICE", name: "대구광역시 동구", type: "지방자치단체", region: "대구광역시 동구", regionIds: ["DAEGU-DONG"], homepage: "https://dong.daegu.kr/", verificationStatus: "공식주소확인", verifiedAt: "2026-09-02", active: true },
+  { id: "ORG-DONG-COUNCIL", name: "대구광역시 동구의회", type: "지방의회", region: "대구광역시 동구", regionIds: ["DAEGU-DONG"], homepage: "https://donggucl.daegu.kr/", verificationStatus: "공식주소확인", verifiedAt: "2026-09-02", active: true },
+  { id: "ORG-SEO-OFFICE", name: "대구광역시 서구", type: "지방자치단체", region: "대구광역시 서구", regionIds: ["DAEGU-SEO"], homepage: "https://www.dgs.go.kr/", verificationStatus: "공식주소확인", verifiedAt: "2026-09-02", active: true },
+  { id: "ORG-SEO-COUNCIL", name: "대구광역시 서구의회", type: "지방의회", region: "대구광역시 서구", regionIds: ["DAEGU-SEO"], homepage: "https://dgscouncil.go.kr/kr/main", verificationStatus: "공식주소확인", verifiedAt: "2026-09-02", active: true },
+  { id: "ORG-NAM-OFFICE", name: "대구광역시 남구", type: "지방자치단체", region: "대구광역시 남구", regionIds: ["DAEGU-NAM"], homepage: "https://www.nam.daegu.kr/", verificationStatus: "공식주소확인", verifiedAt: "2026-09-02", active: true },
+  { id: "ORG-NAM-COUNCIL", name: "대구광역시 남구의회", type: "지방의회", region: "대구광역시 남구", regionIds: ["DAEGU-NAM"], homepage: "https://www.nam.daegu.kr/council/", verificationStatus: "공식주소확인", verifiedAt: "2026-09-02", active: true },
+  { id: "ORG-BUK-OFFICE", name: "대구광역시 북구", type: "지방자치단체", region: "대구광역시 북구", regionIds: ["DAEGU-BUK"], homepage: "https://www.buk.daegu.kr/", verificationStatus: "공식주소확인", verifiedAt: "2026-09-02", active: true },
+  { id: "ORG-BUK-COUNCIL", name: "대구광역시 북구의회", type: "지방의회", region: "대구광역시 북구", regionIds: ["DAEGU-BUK"], homepage: "https://www.bukgucouncil.daegu.kr/", verificationStatus: "공식주소확인", verifiedAt: "2026-09-02", active: true },
+  { id: "ORG-SUSEONG-OFFICE", name: "대구광역시 수성구", type: "지방자치단체", region: "대구광역시 수성구", regionIds: ["DAEGU-SUSEONG"], homepage: "https://www.suseong.kr/", verificationStatus: "공식주소확인", verifiedAt: "2026-09-02", active: true },
+  { id: "ORG-SUSEONG-COUNCIL", name: "대구광역시 수성구의회", type: "지방의회", region: "대구광역시 수성구", regionIds: ["DAEGU-SUSEONG"], homepage: "https://suseongcouncil.daegu.kr/", verificationStatus: "연결전재확인", verifiedAt: "", active: true },
+  { id: "ORG-DALSEO-OFFICE", name: "대구광역시 달서구", type: "지방자치단체", region: "대구광역시 달서구", regionIds: ["DAEGU-DALSEO"], homepage: "https://www.dalseo.daegu.kr/", verificationStatus: "공식주소확인", verifiedAt: "2026-09-02", active: true },
+  { id: "ORG-DALSEO-COUNCIL", name: "대구광역시 달서구의회", type: "지방의회", region: "대구광역시 달서구", regionIds: ["DAEGU-DALSEO"], homepage: "https://www.dalseocouncil.daegu.kr/", verificationStatus: "연결전재확인", verifiedAt: "", active: true },
+  { id: "ORG-DALSEONG-OFFICE", name: "대구광역시 달성군", type: "지방자치단체", region: "대구광역시 달성군", regionIds: ["DAEGU-DALSEONG"], homepage: "https://www.dalseong.daegu.kr/", verificationStatus: "공식주소확인", verifiedAt: "2026-09-02", active: true },
+  { id: "ORG-DALSEONG-COUNCIL", name: "대구광역시 달성군의회", type: "지방의회", region: "대구광역시 달성군", regionIds: ["DAEGU-DALSEONG"], homepage: "https://council.dalseong.go.kr/", verificationStatus: "연결전재확인", verifiedAt: "", active: true },
+  { id: "ORG-GUNWI-OFFICE", name: "대구광역시 군위군", type: "지방자치단체", region: "대구광역시 군위군", regionIds: ["DAEGU-GUNWI"], homepage: "https://www.gunwi.go.kr/", verificationStatus: "공식주소확인", verifiedAt: "2026-09-02", active: true },
+  { id: "ORG-GUNWI-COUNCIL", name: "대구광역시 군위군의회", type: "지방의회", region: "대구광역시 군위군", regionIds: ["DAEGU-GUNWI"], homepage: "https://gwcouncil.kr/", verificationStatus: "공식주소확인", verifiedAt: "2026-09-02", active: true },
+  { id: "ORG-COUNCIL-001", name: "가상 수성구의회(예시)", type: "지방의회", region: "대구광역시 수성구(예시자료)", regionIds: ["DAEGU-SUSEONG"], homepage: "https://example.com/council", verificationStatus: "예시데이터", verifiedAt: "", active: true },
+  { id: "ORG-CITYCOUNCIL-001", name: "가상 대구광역시의회(예시)", type: "지방의회", region: "대구광역시(예시자료)", regionIds: ["DAEGU-METRO"], homepage: "https://example.com/citycouncil", verificationStatus: "예시데이터", verifiedAt: "", active: true },
+  { id: "ORG-LOCAL-001", name: "가상 동구청(예시)", type: "지방자치단체", region: "대구광역시 동구(예시자료)", regionIds: ["DAEGU-DONG"], homepage: "https://example.com/local", verificationStatus: "예시데이터", verifiedAt: "", active: true }
+];

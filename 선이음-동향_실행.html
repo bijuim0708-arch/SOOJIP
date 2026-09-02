@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="선거관리위원회 지도계 관내 정치동향 검토 및 일일보고서 작성 보조도구">
+  <title>선이음-동향 v0.3 · 국회 법안 연결</title>
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#mainContent">본문 바로가기</a>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="주 메뉴">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">선</div>
+        <div>
+          <strong>선이음-동향</strong>
+          <span>v0.3 국회 법안 연결판</span>
+        </div>
+      </div>
+      <nav id="primaryNav" class="primary-nav">
+        <button class="nav-item is-active" data-view="dashboard" aria-current="page"><span aria-hidden="true">◫</span>오늘의 동향</button>
+        <button class="nav-item" data-view="inbox"><span aria-hidden="true">▤</span>수집함 <b id="navInboxCount">0</b></button>
+        <button class="nav-item" data-view="people"><span aria-hidden="true">◎</span>인물별 동향</button>
+        <button class="nav-item" data-view="meetings"><span aria-hidden="true">▥</span>의회·회의록</button>
+        <button class="nav-item" data-view="schedule"><span aria-hidden="true">□</span>일정</button>
+        <button class="nav-item" data-view="report"><span aria-hidden="true">▧</span>일일보고서 <b id="navReportCount">0</b></button>
+        <button class="nav-item" data-view="sources"><span aria-hidden="true">⌁</span>출처 관리</button>
+      </nav>
+      <div class="sidebar-note">
+        <span class="status-dot is-connected"></span>
+          <div><strong>대구 관내 · 혼합자료 모드</strong><span>국회 법안 API 연결 가능</span></div>
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <div>
+          <button id="mobileMenuButton" class="icon-button mobile-only" type="button" aria-label="메뉴 열기">☰</button>
+          <p id="breadcrumb" class="eyebrow">오늘의 동향</p>
+          <h1 id="pageTitle">관내 정치동향 검토</h1>
+        </div>
+        <div class="top-actions">
+          <label class="region-selector"><span>관할 필터</span><select id="globalRegionFilter" aria-label="대구 관할 선택"></select></label>
+          <div class="reference-time"><span>수집 기준</span><strong id="referenceTime">-</strong></div>
+          <button id="exportDataButton" class="button button-secondary" type="button">자료 백업</button>
+          <label class="button button-secondary file-button">자료 복원<input id="importDataInput" type="file" accept="application/json"></label>
+          <button class="button button-primary" type="button" data-go-view="report">오늘 보고서</button>
+        </div>
+      </header>
+
+      <main id="mainContent" tabindex="-1">
+        <section id="view-dashboard" class="view is-active" aria-labelledby="dashboardHeading">
+          <div class="section-heading compact-heading">
+            <div>
+              <p class="eyebrow">DAILY MONITOR</p>
+              <h2 id="dashboardHeading">오늘 확인할 동향</h2>
+              <p><strong id="dashboardScopeName">대구 전체</strong> 공개 출처의 예시자료와 실제 API 자료를 구분하여 검토합니다.</p>
+            </div>
+            <span id="dashboardDataMode" class="demo-ribbon">예시 데이터</span>
+          </div>
+
+          <div id="metricGrid" class="metric-grid" aria-label="오늘의 수집 현황"></div>
+
+          <section id="scopeOverview" class="scope-overview" aria-label="대구 관할 등록 현황"></section>
+
+          <div class="dashboard-grid">
+            <section class="panel panel-main">
+              <div class="panel-heading">
+                <div><span class="section-kicker">우선 확인</span><h3>주요 동향</h3></div>
+                <button class="text-button" type="button" data-go-view="inbox">수집함 전체보기 →</button>
+              </div>
+              <div id="priorityItems" class="priority-list"></div>
+            </section>
+
+            <aside class="panel">
+              <div class="panel-heading"><div><span class="section-kicker">UPCOMING</span><h3>향후 7일 일정</h3></div></div>
+              <div id="upcomingList" class="timeline-list"></div>
+            </aside>
+          </div>
+
+          <div class="dashboard-grid lower-grid">
+            <section class="panel">
+              <div class="panel-heading"><div><span class="section-kicker">SOURCE HEALTH</span><h3>출처 수집 상태</h3></div><button class="text-button" type="button" data-go-view="sources">출처 관리 →</button></div>
+              <div id="sourceHealth" class="source-health"></div>
+            </section>
+            <section class="panel">
+              <div class="panel-heading"><div><span class="section-kicker">CHANGES</span><h3>전일 대비 변경</h3></div></div>
+              <div id="changeSummary" class="change-summary"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="view-inbox" class="view" aria-labelledby="inboxHeading">
+          <div class="section-heading">
+            <div><p class="eyebrow">REVIEW INBOX</p><h2 id="inboxHeading">수집함</h2><p>원문을 확인한 뒤 보고서 반영 여부를 결정합니다.</p></div>
+            <div class="segmented" role="group" aria-label="표시 방식">
+              <button class="is-active" type="button" data-view-mode="card">카드형</button>
+              <button type="button" data-view-mode="list">목록형</button>
+            </div>
+          </div>
+
+          <div class="filter-bar">
+            <label class="search-box"><span class="sr-only">수집자료 검색</span><span aria-hidden="true">⌕</span><input id="inboxSearch" type="search" placeholder="제목·요약·인물·지역 검색"></label>
+            <select id="filterType" aria-label="자료 유형"><option value="">전체 유형</option></select>
+            <select id="filterPerson" aria-label="관련 인물"><option value="">전체 인물</option></select>
+            <select id="filterImportance" aria-label="중요도"><option value="">전체 중요도</option><option>높음</option><option>보통</option><option>참고</option></select>
+            <select id="filterStatus" aria-label="확인상태"><option value="">전체 상태</option><option>미확인</option><option>원문확인</option><option>보고서반영</option><option>제외</option></select>
+            <button id="clearFiltersButton" class="button button-ghost" type="button">초기화</button>
+          </div>
+
+          <div id="bulkBar" class="bulk-bar" hidden>
+            <strong><span id="selectedCount">0</span>건 선택</strong>
+            <button class="button button-primary button-small" type="button" data-bulk-action="report">보고서 반영</button>
+            <button class="button button-secondary button-small" type="button" data-bulk-action="verified">원문 확인</button>
+            <button class="button button-secondary button-small" type="button" data-bulk-action="duplicate">중복 묶기</button>
+            <button class="button button-danger button-small" type="button" data-bulk-action="exclude">제외</button>
+            <button class="text-button" type="button" data-bulk-action="clear">선택 해제</button>
+          </div>
+
+          <div class="result-meta"><strong id="inboxResultCount">0건</strong><span>‘예시 데이터’와 ‘공식 API’ 배지를 확인한 뒤 원문을 검토하세요.</span></div>
+          <div id="inboxItems" class="inbox-grid"></div>
+          <div id="inboxEmpty" class="empty-state" hidden><strong>조건에 맞는 자료가 없습니다.</strong><span>검색어나 필터를 다시 확인해 주세요.</span></div>
+        </section>
+
+        <section id="view-people" class="view" aria-labelledby="peopleHeading">
+          <div class="section-heading">
+            <div><p class="eyebrow">PEOPLE & ORGANIZATIONS</p><h2 id="peopleHeading">인물별 동향</h2><p>대구 관내 대상자와 공식 출처를 한곳에서 확인합니다.</p></div>
+            <button id="addPersonButton" class="button button-primary" type="button">+ 인물 등록</button>
+          </div>
+          <div class="people-layout">
+            <div class="panel people-directory">
+              <label class="search-box"><span class="sr-only">인물 검색</span><span aria-hidden="true">⌕</span><input id="peopleSearch" type="search" placeholder="이름·직책·선거구 검색"></label>
+              <div class="directory-filters">
+                <label><input id="focusPeopleOnly" type="checkbox"> 중점관리만</label>
+                <select id="peopleRecordKind" aria-label="인물 자료 구분"><option value="">전체 자료</option><option value="verified_registry">공식명부</option><option value="sample">예시자료</option></select>
+              </div>
+              <div id="peopleList" class="people-list"></div>
+            </div>
+            <div id="personDetail" class="panel person-detail"></div>
+          </div>
+        </section>
+
+        <section id="view-meetings" class="view" aria-labelledby="meetingsHeading">
+          <div class="section-heading"><div><p class="eyebrow">COUNCIL RECORDS</p><h2 id="meetingsHeading">의회·회의록</h2><p>확인된 발언 원문과 요약을 나란히 검토합니다.</p></div></div>
+          <div class="filter-bar">
+            <select id="meetingCouncilFilter" aria-label="의회"><option value="">전체 의회</option></select>
+            <select id="meetingSpeakerFilter" aria-label="발언자"><option value="">전체 발언자</option></select>
+            <input id="meetingSearch" class="standalone-input" type="search" aria-label="안건 검색" placeholder="안건·발언 검색">
+          </div>
+          <div id="meetingList" class="meeting-list"></div>
+        </section>
+
+        <section id="view-schedule" class="view" aria-labelledby="scheduleHeading">
+          <div class="section-heading"><div><p class="eyebrow">SCHEDULE</p><h2 id="scheduleHeading">일정</h2><p>공개 원문에 명시된 행사와 향후 일정만 표시합니다.</p></div></div>
+          <div id="scheduleSummary" class="schedule-summary"></div>
+          <div id="scheduleGroups" class="schedule-groups"></div>
+        </section>
+
+        <section id="view-report" class="view" aria-labelledby="reportHeading">
+          <div class="section-heading">
+            <div><p class="eyebrow">DAILY REPORT</p><h2 id="reportHeading">일일 정치동향 보고서</h2><p>수집함에서 선택한 자료만 초안에 반영됩니다.</p></div>
+            <div class="report-actions">
+              <button id="copyReportButton" class="button button-secondary" type="button">보고서 복사</button>
+              <button id="saveReportButton" class="button button-secondary" type="button">HTML 저장</button>
+              <button id="printReportButton" class="button button-primary" type="button">인쇄</button>
+            </div>
+          </div>
+          <div class="report-layout">
+            <aside class="panel report-source-panel">
+              <div class="panel-heading"><div><span class="section-kicker">SELECTED</span><h3>반영 자료</h3></div><b id="reportSourceCount">0건</b></div>
+              <div id="reportSourceList" class="report-source-list"></div>
+            </aside>
+            <article id="reportDocument" class="report-document">
+              <div class="report-title-block">
+                <span id="reportDataLabel">내부 검토용 · 선택자료</span>
+                <h3>일일 정치동향</h3>
+                <p>관할: <strong id="reportScopeName">대구 전체</strong></p>
+                <p>수집 기준시각: <strong id="reportReferenceTime">-</strong></p>
+              </div>
+              <div id="reportSections"></div>
+              <label class="report-note"><span>담당자 종합의견</span><textarea id="reportGeneralNote" rows="5" placeholder="필요한 검토사항이나 보고 의견을 직접 입력하세요."></textarea></label>
+              <div class="report-disclaimer">※ 본 문서는 공개자료를 바탕으로 작성한 업무 참고용 초안입니다. 원문 확인과 최종 판단은 담당자가 수행합니다.</div>
+            </article>
+          </div>
+        </section>
+
+        <section id="view-sources" class="view" aria-labelledby="sourcesHeading">
+          <div class="section-heading">
+            <div><p class="eyebrow">SOURCE REGISTRY</p><h2 id="sourcesHeading">출처 관리</h2><p>연결기 상태를 확인하고 공식 공개자료를 수집합니다.</p></div>
+            <button id="addSourceButton" class="button button-primary" type="button">+ 출처 등록</button>
+          </div>
+          <section class="connector-console" aria-labelledby="assemblyConnectorHeading">
+            <div class="connector-head">
+              <div>
+                <span class="section-kicker">CONNECTED · v0.3</span>
+                <h3 id="assemblyConnectorHeading">열린국회정보 · 대구 국회의원 발의법률안</h3>
+                <p>로컬 수집 서비스가 대구 지역구 국회의원 12명의 대표·공동발의 법률안을 공통 자료 형식으로 변환합니다.</p>
+              </div>
+              <span id="assemblyConnectorStatus" class="connector-state is-unknown">확인 전</span>
+            </div>
+            <div class="connector-metrics">
+              <div><span>인증 모드</span><strong id="assemblyApiMode">-</strong></div>
+              <div><span>마지막 연결 확인</span><strong id="assemblyLastChecked">-</strong></div>
+              <div><span>마지막 동기화</span><strong id="assemblyLastSync">-</strong></div>
+              <div><span>최근 결과</span><strong id="assemblySyncResult">아직 동기화하지 않음</strong></div>
+            </div>
+            <div class="connector-actions">
+              <label><span>수집 기간</span><select id="assemblyDays"><option value="7">최근 7일</option><option value="30" selected>최근 30일</option><option value="90">최근 90일</option><option value="365">최근 1년</option></select></label>
+              <button id="checkAssemblyConnectionButton" class="button button-secondary" type="button">연결 확인</button>
+              <button id="syncAssemblyButton" class="button button-primary" type="button">대구 12명 법안 동기화</button>
+            </div>
+            <p id="assemblyConnectorMessage" class="connector-message">먼저 collector 폴더의 샘플 또는 정식키 실행 파일을 열어 로컬 수집 서비스를 실행하세요.</p>
+          </section>
+          <div class="notice-card"><strong>자료 구분</strong><span>국회 법안만 실제 API 연결 대상입니다. 다른 출처의 ‘중지’는 현재 수집기가 아직 연결되지 않았다는 뜻입니다.</span></div>
+          <div id="collectionRules" class="rules-grid" aria-label="수집·표시 원칙"></div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead><tr><th>연결</th><th>출처명</th><th>확인</th><th>유형</th><th>수집방식</th><th>주기</th><th>마지막 결과</th><th>관리</th></tr></thead>
+              <tbody id="sourceTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="itemDialog" class="app-dialog detail-dialog" aria-labelledby="itemDialogTitle">
+    <div class="dialog-head"><div><span id="itemDialogType" class="type-badge"></span><h2 id="itemDialogTitle"></h2></div><button class="icon-button" type="button" data-close-dialog="itemDialog" aria-label="닫기">×</button></div>
+    <div id="itemDialogBody" class="dialog-body"></div>
+  </dialog>
+
+  <dialog id="personDialog" class="app-dialog" aria-labelledby="personDialogTitle">
+    <form id="personForm" method="dialog">
+      <div class="dialog-head"><h2 id="personDialogTitle">인물 등록</h2><button class="icon-button" type="button" data-close-dialog="personDialog" aria-label="닫기">×</button></div>
+      <div class="dialog-body form-grid">
+        <input name="id" type="hidden">
+        <label><span>이름 *</span><input name="name" required></label>
+        <label><span>대상 유형 *</span><select name="type" required><option>국회의원</option><option>지방자치단체장</option><option>시·도의원</option><option>구·시·군의원</option><option>정당 및 지역조직</option><option>기타 기관</option></select></label>
+        <label><span>직책</span><input name="position"></label>
+        <label><span>선거구·관할</span><input name="district"></label>
+        <label><span>관할 필터 *</span><select name="regionId" required></select></label>
+        <label><span>소속</span><input name="affiliation"></label>
+        <label><span>재임기간</span><input name="term" placeholder="2026.07.01.~2030.06.30."></label>
+        <label class="span-2"><span>별칭·뉴스 검색어</span><input name="aliases" placeholder="쉼표로 구분"></label>
+        <label class="span-2"><span>공식 홈페이지</span><input name="homepage" type="url" placeholder="https://"></label>
+        <label><span>공식 블로그</span><input name="blog" type="url" placeholder="https://"></label>
+        <label><span>유튜브</span><input name="youtube" type="url" placeholder="https://"></label>
+        <label><span>페이스북</span><input name="facebook" type="url" placeholder="https://"></label>
+        <label><span>인스타그램</span><input name="instagram" type="url" placeholder="https://"></label>
+        <label><span>Threads</span><input name="threads" type="url" placeholder="https://"></label>
+        <label><span>기타 SNS</span><input name="otherSns" type="url" placeholder="https://"></label>
+        <label><span>상태</span><select name="active"><option value="true">활성</option><option value="false">비활성</option></select></label>
+      </div>
+      <div class="dialog-actions"><button class="button button-secondary" type="button" data-close-dialog="personDialog">취소</button><button class="button button-primary" type="submit">저장</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="sourceDialog" class="app-dialog" aria-labelledby="sourceDialogTitle">
+    <form id="sourceForm" method="dialog">
+      <div class="dialog-head"><h2 id="sourceDialogTitle">출처 등록</h2><button class="icon-button" type="button" data-close-dialog="sourceDialog" aria-label="닫기">×</button></div>
+      <div class="dialog-body form-grid">
+        <input name="id" type="hidden">
+        <label><span>출처명 *</span><input name="name" required></label>
+        <label><span>출처 유형 *</span><select name="type" required><option>국회</option><option>언론</option><option>블로그</option><option>지방의회</option><option>지방자치단체</option><option>유튜브</option><option>SNS</option><option>기타</option></select></label>
+        <label class="span-2"><span>URL *</span><input name="url" type="url" required placeholder="https://"></label>
+        <label><span>수집방식</span><select name="method"><option>API</option><option>RSS</option><option>웹페이지</option><option>수동URL</option></select></label>
+        <label><span>수집주기</span><select name="frequency"><option>매일 08:00</option><option>매일 12:00</option><option>6시간마다</option><option>수동</option></select></label>
+        <label><span>관련 인물·기관</span><input name="related" placeholder="고유 ID 또는 명칭"></label>
+        <label><span>관할 필터 *</span><select name="regionId" required></select></label>
+        <label><span>상태</span><select name="active"><option value="true">활성</option><option value="false">비활성</option></select></label>
+        <label class="span-2"><span>담당자 메모</span><textarea name="memo" rows="3"></textarea></label>
+      </div>
+      <div class="dialog-actions"><button class="button button-secondary" type="button" data-close-dialog="sourceDialog">취소</button><button class="button button-primary" type="submit">저장</button></div>
+    </form>
+  </dialog>
+
+  <div id="toastRegion" class="toast-region" role="status" aria-live="polite"></div>
+
+  <script src="data/settings.js"></script>
+  <script src="data/regions.js"></script>
+  <script src="data/organizations.js"></script>
+  <script src="data/people.js"></script>
+  <script src="data/official-sources.js"></script>
+  <script src="data/sources.js"></script>
+  <script src="data/items.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

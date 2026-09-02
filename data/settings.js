@@ -1,14 +1,14 @@
 window.SUNEUM_DATA = window.SUNEUM_DATA || {};
 window.SUNEUM_DATA.settings = {
-  appId: "SUNEUM-TRENDS-V03",
+  appId: "SUNEUM-SOOJIP-V03",
   version: "0.3.0",
-  title: "선이음-동향",
+  title: "선이음-秀集",
   edition: "국회 법안 실제 API 연결판",
   jurisdiction: "대구광역시",
   referenceTime: "2026-09-02T08:30:00+09:00",
   registryVerifiedAt: "2026-09-02",
   sampleData: true,
-  storageKey: "suneum-trends-v03-user-state",
+  storageKey: "suneum-soojip-v03-user-state",
   collectorBaseUrl: "http://127.0.0.1:3217",
   connectedCollectors: ["국회의원 발의법률안"],
   categories: [

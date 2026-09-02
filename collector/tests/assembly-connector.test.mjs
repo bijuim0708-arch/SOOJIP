@@ -12,6 +12,23 @@ test("열린국회정보 응답에서 행을 추출한다", () => {
   assert.equal(parsed.rows[0].BILL_NO, "EXAMPLE-0001");
 });
 
+test("루트 RESULT의 INFO-200은 오류가 아니라 빈 결과로 처리한다", () => {
+  const parsed = parseAssemblyPayload({
+    RESULT: { CODE: "INFO-200", MESSAGE: "해당하는 데이터가 없습니다." }
+  });
+  assert.equal(parsed.total, 0);
+  assert.deepEqual(parsed.rows, []);
+  assert.equal(parsed.resultCode, "INFO-200");
+  assert.equal(parsed.responseShape, "root-result");
+});
+
+test("루트 RESULT의 인증·요청 오류는 실제 오류로 처리한다", () => {
+  assert.throws(
+    () => parseAssemblyPayload({ RESULT: { CODE: "INFO-100", MESSAGE: "인증키가 필요합니다." } }),
+    /INFO-100/
+  );
+});
+
 test("대구 의원 대표발의 자료를 공통 형식으로 변환한다", () => {
   const member = DAEGU_MEMBERS.find((entry) => entry.name === "김기웅");
   const rows = parseAssemblyPayload(fixture).rows;

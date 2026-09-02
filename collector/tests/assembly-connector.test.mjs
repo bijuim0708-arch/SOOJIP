@@ -3,7 +3,7 @@ import fs from "node:fs";
 import test from "node:test";
 import { DAEGU_MEMBERS, normalizeAssemblyRows, parseAssemblyPayload } from "../server.mjs";
 
-const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/assembly-bills.example.json", import.meta.url), "utf8"));
+const fixture = JSON.parse(fs.readFileSync(new URL("../assembly-bills.example.json", import.meta.url), "utf8"));
 
 test("열린국회정보 응답에서 행을 추출한다", () => {
   const parsed = parseAssemblyPayload(fixture);

@@ -1,0 +1,27 @@
+name: Assembly connector tests
+
+on:
+  pull_request:
+    paths:
+      - "collector/**"
+      - ".github/workflows/assembly-tests.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "collector/**"
+      - ".github/workflows/assembly-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run assembly connector unit tests
+        run: node --test collector/tests/assembly-connector.test.mjs

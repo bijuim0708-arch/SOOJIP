@@ -45,6 +45,7 @@ try {
   console.log(`  reverse endpoint: ${health.reverseScanEndpoint || "-"}`);
   console.log(`  reverse page size: ${health.reverseScanPageSize ?? "-"}`);
   console.log(`  reverse page limit: ${health.reverseScanPageLimit ?? "-"}`);
+  console.log(`  reverse retries : ${health.reverseScanRetryAttempts ?? "-"}`);
 
   console.log("[3/4] Checking representative bills and proposer enrichment");
   const sync = await readJson("/api/assembly/sync?days=30");
@@ -72,6 +73,7 @@ try {
   }
 
   console.log("[4/4] Checking Daegu co-sponsor reverse scan");
+  console.log("  reverse scan uses paged requests with retry protection");
   const reverse = await readJson("/api/assembly/cosponsors?days=30");
   console.log(`  assembly page size: ${reverse.assemblyPageSize ?? "-"}`);
   console.log(`  assembly pages  : ${reverse.assemblyPagesFetched ?? "-"}`);

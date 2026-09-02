@@ -4,8 +4,10 @@ import test from "node:test";
 import {
   DAEGU_MEMBERS,
   enrichAssemblyItemWithProposers,
+  filterBillsByDays,
   normalizeAssemblyRows,
   normalizeBillProposers,
+  normalizeCosponsoredBill,
   parseAssemblyPayload,
   parseBillProposersPayload
 } from "../server.mjs";
@@ -54,6 +56,65 @@ const proposerFixture = {
           NASS_CD: "MP003",
           ERACO: "22",
           PPSR_CN: "3"
+        }
+      ]
+    }
+  ]
+};
+
+const reverseProposerFixture = {
+  BILLINFOPPSR: [
+    {
+      head: [
+        { list_total_count: 4 },
+        { RESULT: { CODE: "INFO-000", MESSAGE: "정상" } }
+      ]
+    },
+    {
+      row: [
+        {
+          BILL_ID: "PRC_REVERSE",
+          PPSR_NM: "비대구대표",
+          PPSR_POLY_NM: "가상정당",
+          REP_DIV: "대표발의",
+          PPSR_ROLE: "발의자",
+          PPSR_KIND: "의원",
+          NASS_CD: "MP100",
+          ERACO: "22",
+          PPSR_CN: "1"
+        },
+        {
+          BILL_ID: "PRC_REVERSE",
+          PPSR_NM: "우재준",
+          PPSR_POLY_NM: "국민의힘",
+          REP_DIV: "",
+          PPSR_ROLE: "발의자",
+          PPSR_KIND: "의원",
+          NASS_CD: "MP101",
+          ERACO: "22",
+          PPSR_CN: "2"
+        },
+        {
+          BILL_ID: "PRC_REVERSE",
+          PPSR_NM: "추경호",
+          PPSR_POLY_NM: "국민의힘",
+          REP_DIV: "",
+          PPSR_ROLE: "발의자",
+          PPSR_KIND: "의원",
+          NASS_CD: "MP102",
+          ERACO: "22",
+          PPSR_CN: "3"
+        },
+        {
+          BILL_ID: "PRC_REVERSE",
+          PPSR_NM: "비대구공동",
+          PPSR_POLY_NM: "가상정당",
+          REP_DIV: "",
+          PPSR_ROLE: "발의자",
+          PPSR_KIND: "의원",
+          NASS_CD: "MP103",
+          ERACO: "22",
+          PPSR_CN: "4"
         }
       ]
     }
@@ -144,4 +205,52 @@ test("대표발의 법안에 공동발의자 상세와 대구 공동발의자 �
   assert.deepEqual(enriched.apiMeta.daeguCoProposerNames, ["최은석"]);
   assert.ok(enriched.rawExcerpt.includes("공동발의 최은석·홍길동"));
   assert.ok(enriched.summary.includes("공동발의 2명"));
+});
+
+test("다른 의원 대표발의 법안의 대구 공동발의자를 역검색 자료로 변환한다", () => {
+  const row = {
+    ...parseAssemblyPayload(fixture).rows[0],
+    BILL_ID: "PRC_REVERSE",
+    BILL_NO: "2220999",
+    BILL_NAME: "공동발의 역검색 시험법률안",
+    PROPOSE_DT: "20260901",
+    PROPOSER: "비대구대표의원 등 4인",
+    RST_PROPOSER: "비대구대표"
+  };
+  const detail = {
+    proposers: normalizeBillProposers(parseBillProposersPayload(reverseProposerFixture).rows),
+    possiblyTruncated: false
+  };
+  const item = normalizeCosponsoredBill(row, detail, "2026-09-02T00:00:00.000Z");
+  assert.ok(item);
+  assert.equal(item.type, "법안 공동발의");
+  assert.deepEqual(item.personIds.sort(), ["PER-MP-DG-BUK-A", "PER-MP-DG-DALSEONG"].sort());
+  assert.deepEqual(item.apiMeta.daeguCoProposerNames.sort(), ["우재준", "추경호"].sort());
+  assert.deepEqual(item.apiMeta.leadProposerNames, ["비대구대표"]);
+  assert.ok(item.summary.includes("우재준·추경호"));
+  assert.equal(item.apiMeta.reverseScan, true);
+});
+
+test("대구 의원이 대표발의자인 법안은 공동발의 역검색 결과에서 제외한다", () => {
+  const row = {
+    ...parseAssemblyPayload(fixture).rows[0],
+    BILL_ID: "PRC_TEST",
+    BILL_NO: "2220998",
+    PROPOSE_DT: "20260901"
+  };
+  const detail = {
+    proposers: normalizeBillProposers(parseBillProposersPayload(proposerFixture).rows),
+    possiblyTruncated: false
+  };
+  assert.equal(normalizeCosponsoredBill(row, detail), null);
+});
+
+test("선택 기간의 법안만 공동발의 역검색 후보로 남긴다", () => {
+  const rows = [
+    { BILL_ID: "NEW", PROPOSE_DT: "20260901" },
+    { BILL_ID: "OLD", PROPOSE_DT: "20260701" },
+    { BILL_ID: "UNKNOWN", PROPOSE_DT: "" }
+  ];
+  const filtered = filterBillsByDays(rows, 30, new Date("2026-09-02T12:00:00+09:00"));
+  assert.deepEqual(filtered.map((row) => row.BILL_ID), ["NEW"]);
 });

@@ -24,4 +24,4 @@ jobs:
         with:
           node-version: "22"
       - name: Run assembly connector unit tests
-        run: node --test collector/tests/assembly-connector.test.mjs
+        run: node --test collector/tests/*.test.mjs

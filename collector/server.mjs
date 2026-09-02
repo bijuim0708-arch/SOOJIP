@@ -1,15 +1,16 @@
 import http from "node:http";
 import { pathToFileURL } from "node:url";
 
-export const SERVICE_VERSION = "0.3.5";
+export const SERVICE_VERSION = "0.3.6";
 export const HOST = "127.0.0.1";
 export const PORT = Number.parseInt(process.env.SUNEUM_COLLECTOR_PORT || "3217", 10);
 export const ASSEMBLY_ENDPOINT = "nzmimeepazxkubdpn";
 export const BILL_PROPOSERS_ENDPOINT = "BILLINFOPPSR";
 export const ASSEMBLY_URL = `https://open.assembly.go.kr/portal/openapi/${ASSEMBLY_ENDPOINT}`;
 export const BILL_PROPOSERS_URL = `https://open.assembly.go.kr/portal/openapi/${BILL_PROPOSERS_ENDPOINT}`;
-export const ALL_BILL_PAGE_SIZE = 1000;
-export const ALL_BILL_PAGE_LIMIT = 50;
+export const ALL_BILL_PAGE_SIZE = 500;
+export const ALL_BILL_PAGE_LIMIT = 100;
+export const FETCH_RETRY_ATTEMPTS = 3;
 
 export const DAEGU_MEMBERS = [
   { id: "PER-MP-DG-JUNG-NAM", name: "김기웅", regionIds: ["DAEGU-JUNG", "DAEGU-NAM"], regions: ["대구광역시 중구", "대구광역시 남구"] },
@@ -32,6 +33,8 @@ const requestTimes = [];
 const MEMBER_BILL_CACHE_MS = 10 * 60 * 1000;
 const ALL_BILL_CACHE_MS = 6 * 60 * 60 * 1000;
 const PROPOSER_CACHE_MS = 24 * 60 * 60 * 1000;
+const ALL_BILL_TIMEOUT_MS = 45000;
+const PAGE_PAUSE_MS = 150;
 
 function jsonResponse(response, status, payload) {
   response.writeHead(status, {
@@ -70,6 +73,44 @@ function cacheFresh(entry, ttlMs) {
 function daeguMemberByName(name) {
   const compact = cleanText(name).replace(/\s/g, "");
   return DAEGU_MEMBERS.find((member) => member.name.replace(/\s/g, "") === compact);
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function describeFetchError(error) {
+  const parts = [
+    cleanText(error?.message),
+    cleanText(error?.cause?.code),
+    cleanText(error?.cause?.message)
+  ].filter(Boolean);
+  return [...new Set(parts)].join(" / ") || "알 수 없는 네트워크 오류";
+}
+
+export async function fetchJsonWithRetry(url, options = {}) {
+  const timeoutMs = Number(options.timeoutMs) || 15000;
+  const attempts = Math.max(1, Number(options.attempts) || FETCH_RETRY_ATTEMPTS);
+  const label = cleanText(options.label) || "열린국회정보 요청";
+  let lastError;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await fetchWithTimeout(url, timeoutMs);
+      if (!response.ok) {
+        const error = new Error(`HTTP ${response.status}`);
+        error.noRetry = response.status >= 400 && response.status < 500 && response.status !== 429;
+        throw error;
+      }
+      return await response.json();
+    } catch (error) {
+      lastError = error;
+      if (error?.noRetry || attempt >= attempts) break;
+      await wait(400 * attempt);
+    }
+  }
+
+  throw new Error(`${label} 실패(${attempts}회 시도): ${describeFetchError(lastError)}`);
 }
 
 export function parseOpenAssemblyPayload(payload, endpoint) {
@@ -380,9 +421,12 @@ async function fetchMemberBills(member, apiKey, pageSize) {
       AGE: "22",
       PROPOSER: member.name
     });
-    const response = await fetchWithTimeout(`${ASSEMBLY_URL}?${params.toString()}`);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const parsed = parseAssemblyPayload(await response.json());
+    const payload = await fetchJsonWithRetry(`${ASSEMBLY_URL}?${params.toString()}`, {
+      timeoutMs: 20000,
+      attempts: FETCH_RETRY_ATTEMPTS,
+      label: `${member.name} 의원 법안 ${page}페이지`
+    });
+    const parsed = parseAssemblyPayload(payload);
     total = parsed.total;
     rows.push(...parsed.rows);
     pagesFetched = page;
@@ -423,9 +467,12 @@ async function fetchAllMemberBills(apiKey) {
       pSize: String(ALL_BILL_PAGE_SIZE),
       AGE: "22"
     });
-    const response = await fetchWithTimeout(`${ASSEMBLY_URL}?${params.toString()}`, 30000);
-    if (!response.ok) throw new Error(`전체 법안 목록 HTTP ${response.status}`);
-    const parsed = parseAssemblyPayload(await response.json());
+    const payload = await fetchJsonWithRetry(`${ASSEMBLY_URL}?${params.toString()}`, {
+      timeoutMs: ALL_BILL_TIMEOUT_MS,
+      attempts: FETCH_RETRY_ATTEMPTS,
+      label: `전체 법안 목록 ${page}페이지`
+    });
+    const parsed = parseAssemblyPayload(payload);
     total = parsed.total;
     rows.push(...parsed.rows);
     pagesFetched = page;
@@ -435,6 +482,7 @@ async function fetchAllMemberBills(apiKey) {
     if (page > ALL_BILL_PAGE_LIMIT) {
       throw new Error(`제22대 의원발의 법안 전체 조회가 안전 한도(${ALL_BILL_PAGE_LIMIT}페이지 × ${ALL_BILL_PAGE_SIZE}건)를 초과했습니다.`);
     }
+    await wait(PAGE_PAUSE_MS);
   }
 
   const value = { rows, total, pagesFetched, pageSize: ALL_BILL_PAGE_SIZE, cached: false };
@@ -454,9 +502,12 @@ async function fetchBillProposers(billId, apiKey) {
     pSize: "100",
     BILL_ID: billId
   });
-  const response = await fetchWithTimeout(`${BILL_PROPOSERS_URL}?${params.toString()}`);
-  if (!response.ok) throw new Error(`BILLINFOPPSR HTTP ${response.status}`);
-  const parsed = parseBillProposersPayload(await response.json());
+  const payload = await fetchJsonWithRetry(`${BILL_PROPOSERS_URL}?${params.toString()}`, {
+    timeoutMs: 20000,
+    attempts: FETCH_RETRY_ATTEMPTS,
+    label: `BILLINFOPPSR ${billId}`
+  });
+  const parsed = parseBillProposersPayload(payload);
   const proposers = normalizeBillProposers(parsed.rows);
   const value = {
     billId,
@@ -607,7 +658,7 @@ async function syncDaeguCosponsoredBills(apiKey, days) {
     matchedMemberNames: matchedMemberIds.map((id) => DAEGU_MEMBERS.find((member) => member.id === id)?.name).filter(Boolean),
     partial: proposerLookupFailures.length > 0,
     items,
-    notice: "제22대 국회의원 발의법률안 전체 목록을 대용량 페이지로 조회한 뒤 선택 기간의 법안을 추리고 BILLINFOPPSR 제안자정보를 확인하여, 대구 의원이 공동발의자이고 대표발의자는 대구 의원이 아닌 법안만 반환합니다. 제안자정보가 100건 이상인 일부 의안은 목록 제한 가능성을 확인해야 하며, 모든 자료는 원문 확인 후 사용하세요."
+    notice: "제22대 국회의원 발의법률안 전체 목록을 안정화된 페이지 조회와 재시도로 수집한 뒤 선택 기간의 법안을 추리고 BILLINFOPPSR 제안자정보를 확인하여, 대구 의원이 공동발의자이고 대표발의자는 대구 의원이 아닌 법안만 반환합니다. 제안자정보가 100건 이상인 일부 의안은 목록 제한 가능성을 확인해야 하며, 모든 자료는 원문 확인 후 사용하세요."
   };
 }
 
@@ -639,6 +690,7 @@ export function createCollectorServer() {
         reverseScanEndpoint: "/api/assembly/cosponsors",
         reverseScanPageSize: ALL_BILL_PAGE_SIZE,
         reverseScanPageLimit: ALL_BILL_PAGE_LIMIT,
+        reverseScanRetryAttempts: FETCH_RETRY_ATTEMPTS,
         startedAt,
         cacheEntries: cache.size
       });
@@ -683,7 +735,7 @@ export function startCollectorServer() {
     console.log(`상태: http://${HOST}:${PORT}/health`);
     console.log(`인증: ${mode} · API 키 값은 표시하거나 저장하지 않습니다.`);
     console.log("수집 범위: 대구 국회의원 대표발의 + BILLINFOPPSR 제안자 상세 + 대구 의원 공동발의 역검색");
-    console.log(`공동발의 역검색: /api/assembly/cosponsors?days=30 · 전체 법안 ${ALL_BILL_PAGE_SIZE}건/페이지`);
+    console.log(`공동발의 역검색: /api/assembly/cosponsors?days=30 · 전체 법안 ${ALL_BILL_PAGE_SIZE}건/페이지 · 요청당 최대 ${FETCH_RETRY_ATTEMPTS}회 시도`);
     console.log("이 창을 닫으면 국회 자동수집 연결이 종료됩니다.");
   });
   return server;

@@ -32,18 +32,19 @@ try {
   console.log("========================================");
   console.log(`SUNEUM SOOJIP Assembly API diagnostic v${SERVICE_VERSION}`);
   console.log("========================================");
-  console.log("[1/3] Starting local collector service");
+  console.log("[1/4] Starting local collector service");
   await listen();
 
-  console.log("[2/3] Checking /health");
+  console.log("[2/4] Checking /health");
   const health = await readJson("/health");
   console.log(`  service version : ${health.version || SERVICE_VERSION}`);
   console.log(`  API mode        : ${health.apiMode || "-"}`);
   console.log(`  target members  : ${health.members ?? "-"}`);
   console.log(`  bill scope      : ${health.billScope || "-"}`);
   console.log(`  proposer API    : ${health.proposerEndpoint || "-"}`);
+  console.log(`  reverse endpoint: ${health.reverseScanEndpoint || "-"}`);
 
-  console.log("[3/3] Calling Open Assembly with issued key");
+  console.log("[3/4] Checking representative bills and proposer enrichment");
   const sync = await readJson("/api/assembly/sync?days=30");
   const returnedBills = Array.isArray(sync.items) ? sync.items.length : 0;
   console.log(`  queried members : ${sync.queriedMembers ?? "-"}`);
@@ -68,8 +69,30 @@ try {
     throw new Error("BILLINFOPPSR proposer enrichment did not succeed for any returned bill.");
   }
 
+  console.log("[4/4] Checking Daegu co-sponsor reverse scan");
+  const reverse = await readJson("/api/assembly/cosponsors?days=30");
+  console.log(`  assembly pages  : ${reverse.assemblyPagesFetched ?? "-"}`);
+  console.log(`  assembly total  : ${reverse.assemblyBillsTotal ?? "-"}`);
+  console.log(`  recent candidates: ${reverse.recentCandidateBills ?? "-"}`);
+  console.log(`  proposer asked  : ${reverse.proposerRequestedBills ?? "-"}`);
+  console.log(`  proposer enriched: ${reverse.proposerEnrichedBills ?? "-"}`);
+  console.log(`  matched bills   : ${reverse.matchedBills ?? "-"}`);
+  console.log(`  matched members : ${Array.isArray(reverse.matchedMemberNames) ? reverse.matchedMemberNames.join(", ") || "none" : "-"}`);
+  console.log(`  reverse failures: ${Array.isArray(reverse.proposerLookupFailures) ? reverse.proposerLookupFailures.length : "-"}`);
+  console.log(`  list-limit flags: ${reverse.proposerListTruncatedCount ?? "-"}`);
+  console.log(`  partial failure : ${reverse.partial ? "yes" : "no"}`);
+  if (reverse.proposerLookupFailures?.length) {
+    for (const failure of reverse.proposerLookupFailures.slice(0, 10)) {
+      console.log(`    - reverse ${failure.billNo || failure.billId}: ${failure.message || "failed"}`);
+    }
+  }
+
+  if (Number(reverse.proposerRequestedBills || 0) > 0 && Number(reverse.proposerEnrichedBills || 0) === 0) {
+    throw new Error("Co-sponsor reverse scan could not enrich any recent candidate bill.");
+  }
+
   console.log("");
-  console.log("[SUCCESS] Issued-key access and BILLINFOPPSR proposer enrichment are working.");
+  console.log("[SUCCESS] Issued-key access, proposer enrichment, and Daegu co-sponsor reverse scan are working.");
   console.log("API key value was not printed or saved by this diagnostic.");
 } catch (error) {
   console.error("");

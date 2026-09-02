@@ -1,7 +1,7 @@
 import http from "node:http";
 import { pathToFileURL } from "node:url";
 
-export const SERVICE_VERSION = "0.3.1";
+export const SERVICE_VERSION = "0.3.2";
 export const HOST = "127.0.0.1";
 export const PORT = Number.parseInt(process.env.SUNEUM_COLLECTOR_PORT || "3217", 10);
 export const ASSEMBLY_ENDPOINT = "nzmimeepazxkubdpn";
@@ -52,18 +52,38 @@ function safeBillKey(row) {
   return cleanText(row.BILL_NO || row.BILL_ID).replace(/[^A-Za-z0-9가-힣_-]/g, "-");
 }
 
+function isEmptyResultCode(code) {
+  return code === "INFO-200" || code === "DATA-000";
+}
+
 export function parseAssemblyPayload(payload) {
   const bucket = payload?.[ASSEMBLY_ENDPOINT];
+  const rootResult = payload?.RESULT;
+
+  // 열린국회정보는 검색 결과가 없을 때 간혹
+  // { RESULT: { CODE: "INFO-200", MESSAGE: ... } } 형식만 반환한다.
+  if (!Array.isArray(bucket) && rootResult && typeof rootResult === "object") {
+    const code = cleanText(rootResult.CODE);
+    const message = cleanText(rootResult.MESSAGE);
+    if (isEmptyResultCode(code)) {
+      return { rows: [], total: 0, resultCode: code, responseShape: "root-result" };
+    }
+    throw new Error(message ? `열린국회정보 오류(${code || "UNKNOWN"}): ${message}` : `열린국회정보 오류(${code || "UNKNOWN"})`);
+  }
+
   if (!Array.isArray(bucket)) throw new Error("열린국회정보 응답 형식을 확인할 수 없습니다.");
   const head = bucket.flatMap((part) => Array.isArray(part?.head) ? part.head : []);
   const result = head.find((entry) => entry?.RESULT)?.RESULT || {};
   const code = cleanText(result.CODE);
-  if (code && code !== "INFO-000" && code !== "INFO-200") {
+  if (code && code !== "INFO-000" && !isEmptyResultCode(code)) {
     throw new Error(cleanText(result.MESSAGE) || `열린국회정보 오류(${code})`);
+  }
+  if (isEmptyResultCode(code)) {
+    return { rows: [], total: 0, resultCode: code, responseShape: "endpoint" };
   }
   const rows = bucket.flatMap((part) => Array.isArray(part?.row) ? part.row : []);
   const total = Number(head.find((entry) => Number.isFinite(Number(entry?.list_total_count)))?.list_total_count || rows.length);
-  return { rows, total, resultCode: code || "INFO-000" };
+  return { rows, total, resultCode: code || "INFO-000", responseShape: "endpoint" };
 }
 
 function proposerText(row) {

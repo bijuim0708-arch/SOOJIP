@@ -1,7 +1,7 @@
 import http from "node:http";
 import { pathToFileURL } from "node:url";
 
-export const SERVICE_VERSION = "0.3.0";
+export const SERVICE_VERSION = "0.3.1";
 export const HOST = "127.0.0.1";
 export const PORT = Number.parseInt(process.env.SUNEUM_COLLECTOR_PORT || "3217", 10);
 export const ASSEMBLY_ENDPOINT = "nzmimeepazxkubdpn";
@@ -84,16 +84,18 @@ function isRepresentative(row, memberName) {
 export function normalizeAssemblyRows(memberResults, collectedAt = new Date().toISOString()) {
   const merged = new Map();
 
-  memberResults.forEach(({ member, rows, trustSearchFilter = false }) => {
+  memberResults.forEach(({ member, rows, trustSearchFilter = false, searchKind = "" }) => {
     rows.forEach((row) => {
       const mentions = rowMentions(row, member.name);
-      if (!mentions && !trustSearchFilter) return;
+      const trustedRepresentative = trustSearchFilter && searchKind === "representative";
+      if (!mentions && !trustedRepresentative) return;
       const key = safeBillKey(row);
       if (!key) return;
       const current = merged.get(key) || { row, members: new Map(), representativeIds: new Set(), matchBasis: new Set() };
       current.members.set(member.id, member);
-      if (isRepresentative(row, member.name)) current.representativeIds.add(member.id);
-      current.matchBasis.add(mentions ? "API 제안자 필드" : "API 제안자 검색조건");
+      if (trustedRepresentative || isRepresentative(row, member.name)) current.representativeIds.add(member.id);
+      if (trustedRepresentative) current.matchBasis.add("API 대표발의자 검색조건");
+      else if (mentions) current.matchBasis.add("API 제안자 필드");
       merged.set(key, current);
     });
   });
@@ -177,15 +179,46 @@ async function fetchWithTimeout(url, timeoutMs = 15000) {
 }
 
 async function fetchMemberBills(member, apiKey, pageSize) {
-  const cacheKey = `${member.name}:${pageSize}:${apiKey === "sample" ? "sample" : "full"}`;
+  const sampleMode = apiKey === "sample";
+  const cacheKey = `${member.name}:${pageSize}:${sampleMode ? "sample" : "full"}`;
   const cached = cache.get(cacheKey);
   if (cached && Date.now() - cached.savedAt < 10 * 60 * 1000) return { ...cached.value, cached: true };
 
-  const params = new URLSearchParams({ KEY: apiKey, Type: "json", pIndex: "1", pSize: String(pageSize), AGE: "22", PROPOSER: member.name });
-  const response = await fetchWithTimeout(`${ASSEMBLY_URL}?${params.toString()}`);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const parsed = parseAssemblyPayload(await response.json());
-  const value = { member, rows: parsed.rows, total: parsed.total, trustSearchFilter: apiKey !== "sample", cached: false };
+  const rows = [];
+  let total = 0;
+  let page = 1;
+  let pagesFetched = 0;
+
+  while (true) {
+    const params = new URLSearchParams({
+      KEY: apiKey,
+      Type: "json",
+      pIndex: String(page),
+      pSize: String(pageSize),
+      AGE: "22",
+      PROPOSER: member.name
+    });
+    const response = await fetchWithTimeout(`${ASSEMBLY_URL}?${params.toString()}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const parsed = parseAssemblyPayload(await response.json());
+    total = parsed.total;
+    rows.push(...parsed.rows);
+    pagesFetched = page;
+
+    if (sampleMode || parsed.rows.length === 0 || rows.length >= total || parsed.rows.length < pageSize) break;
+    page += 1;
+    if (page > 100) throw new Error(`${member.name} 의원 법안 조회 페이지가 안전 한도(100페이지)를 초과했습니다.`);
+  }
+
+  const value = {
+    member,
+    rows,
+    total,
+    pagesFetched,
+    trustSearchFilter: !sampleMode,
+    searchKind: "representative",
+    cached: false
+  };
   cache.set(cacheKey, { savedAt: Date.now(), value });
   return value;
 }
@@ -221,6 +254,7 @@ async function syncAssemblyBills(apiKey, days) {
     serviceVersion: SERVICE_VERSION,
     fetchedAt: new Date().toISOString(),
     apiMode: sampleMode ? "sample" : "issued-key",
+    scope: "representative-bills",
     rangeDays: days,
     queriedMembers: DAEGU_MEMBERS.length,
     successfulMembers: successes.length,
@@ -228,8 +262,8 @@ async function syncAssemblyBills(apiKey, days) {
     partial: failures.length > 0,
     items: normalized,
     notice: sampleMode
-      ? "sample 키는 응답 건수가 제한됩니다. 전체 동기화에는 열린국회정보에서 발급한 인증키가 필요합니다."
-      : "정식 인증키로 조회했습니다. 모든 자료는 원문 확인 후 사용하세요."
+      ? "sample 키는 응답 건수가 제한됩니다. 연결 확인용으로 사용하고, 전체 대표발의 법안 동기화에는 열린국회정보에서 발급한 인증키가 필요합니다."
+      : "정식 인증키로 대구 국회의원 대표발의 법률안을 조회했습니다. 공동발의 목록은 별도 제안자 API 연결 후 제공하며, 모든 자료는 원문 확인 후 사용하세요."
   };
 }
 
@@ -252,10 +286,11 @@ export function createCollectorServer() {
       const apiKey = process.env.SUNEUM_ASSEMBLY_API_KEY || "sample";
       return jsonResponse(response, 200, {
         ok: true,
-        service: "선이음-동향 국회 연결기",
+        service: "선이음-秀集 국회 연결기",
         version: SERVICE_VERSION,
         apiMode: apiKey === "sample" ? "sample" : "issued-key",
         members: DAEGU_MEMBERS.length,
+        billScope: "representative",
         startedAt,
         cacheEntries: cache.size
       });
@@ -283,9 +318,10 @@ export function startCollectorServer() {
   const server = createCollectorServer();
   server.listen(PORT, HOST, () => {
     const mode = (process.env.SUNEUM_ASSEMBLY_API_KEY || "sample") === "sample" ? "샘플 키" : "발급 키";
-    console.log(`선이음-동향 국회 연결기 v${SERVICE_VERSION}`);
+    console.log(`선이음-秀集 국회 연결기 v${SERVICE_VERSION}`);
     console.log(`상태: http://${HOST}:${PORT}/health`);
     console.log(`인증: ${mode} · API 키 값은 표시하거나 저장하지 않습니다.`);
+    console.log("수집 범위: 대구 국회의원 대표발의 법률안 · 공동발의는 후속 연결 대상입니다.");
     console.log("이 창을 닫으면 국회 자동수집 연결이 종료됩니다.");
   });
   return server;

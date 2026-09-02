@@ -3,7 +3,7 @@ import fs from "node:fs";
 import test from "node:test";
 import { DAEGU_MEMBERS, normalizeAssemblyRows, parseAssemblyPayload } from "../server.mjs";
 
-const fixture = JSON.parse(fs.readFileSync(new URL("../fixtures/assembly-bills.example.json", import.meta.url), "utf8"));
+const fixture = JSON.parse(fs.readFileSync(new URL("../assembly-bills.example.json", import.meta.url), "utf8"));
 
 test("열린국회정보 응답에서 행을 추출한다", () => {
   const parsed = parseAssemblyPayload(fixture);
@@ -28,4 +28,18 @@ test("제안자 필드에 없는 의원은 샘플 응답에서 연결하지 않�
   const member = DAEGU_MEMBERS.find((entry) => entry.name === "추경호");
   const rows = parseAssemblyPayload(fixture).rows;
   assert.equal(normalizeAssemblyRows([{ member, rows, trustSearchFilter: false }]).length, 0);
+});
+
+test("정식키의 PROPOSER 검색 결과는 대표발의 검색조건으로 취급한다", () => {
+  const member = DAEGU_MEMBERS.find((entry) => entry.name === "김기웅");
+  const row = {
+    ...parseAssemblyPayload(fixture).rows[0],
+    PROPOSER: "의원 등 10인",
+    RST_PROPOSER: "",
+    PUBL_PROPOSER: ""
+  };
+  const items = normalizeAssemblyRows([{ member, rows: [row], trustSearchFilter: true, searchKind: "representative" }]);
+  assert.equal(items.length, 1);
+  assert.equal(items[0].type, "법안 대표발의");
+  assert.ok(items[0].apiMeta.matchBasis.includes("API 대표발의자 검색조건"));
 });

@@ -1,4 +1,4 @@
-import { BaseConnector } from "../connector-interface.js";
+import { BaseConnector } from "./connector-interface.js";
 
 export class AssemblyConnector extends BaseConnector {
   async collect() {

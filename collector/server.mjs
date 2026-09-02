@@ -1,7 +1,7 @@
 import http from "node:http";
 import { pathToFileURL } from "node:url";
 
-export const SERVICE_VERSION = "0.3.5";
+export const SERVICE_VERSION = "0.3.6";
 export const HOST = "127.0.0.1";
 export const PORT = Number.parseInt(process.env.SUNEUM_COLLECTOR_PORT || "3217", 10);
 export const ASSEMBLY_ENDPOINT = "nzmimeepazxkubdpn";
@@ -23,7 +23,7 @@ export const DAEGU_MEMBERS = [
   { id: "PER-MP-DG-DALSEO-A", name: "유영하", regionIds: ["DAEGU-DALSEO"], regions: ["대구광역시 달서구"] },
   { id: "PER-MP-DG-DALSEO-B", name: "윤재옥", regionIds: ["DAEGU-DALSEO"], regions: ["대구광역시 달서구"] },
   { id: "PER-MP-DG-DALSEO-C", name: "권영진", regionIds: ["DAEGU-DALSEO"], regions: ["대구광역시 달서구"] },
-  { id: "PER-MP-DG-DALSEONG", name: "추경호", regionIds: ["DAEGU-DALSEONG"], regions: ["대구광역시 달성군"] }
+  { id: "PER-MP-DG-DALSEONG-2026-LJS", name: "이진숙", regionIds: ["DAEGU-DALSEONG"], regions: ["대구광역시 달성군"] }
 ];
 
 const startedAt = new Date().toISOString();

@@ -96,7 +96,7 @@ const reverseProposerFixture = {
         },
         {
           BILL_ID: "PRC_REVERSE",
-          PPSR_NM: "추경호",
+          PPSR_NM: "이진숙",
           PPSR_POLY_NM: "국민의힘",
           REP_DIV: "",
           PPSR_ROLE: "발의자",
@@ -158,7 +158,7 @@ test("대구 의원 대표발의 자료를 공통 형식으로 변환한다", ()
 });
 
 test("제안자 필드에 없는 의원은 샘플 응답에서 연결하지 않는다", () => {
-  const member = DAEGU_MEMBERS.find((entry) => entry.name === "추경호");
+  const member = DAEGU_MEMBERS.find((entry) => entry.name === "이진숙");
   const rows = parseAssemblyPayload(fixture).rows;
   assert.equal(normalizeAssemblyRows([{ member, rows, trustSearchFilter: false }]).length, 0);
 });
@@ -224,10 +224,10 @@ test("다른 의원 대표발의 법안의 대구 공동발의자를 역검색 �
   const item = normalizeCosponsoredBill(row, detail, "2026-09-02T00:00:00.000Z");
   assert.ok(item);
   assert.equal(item.type, "법안 공동발의");
-  assert.deepEqual(item.personIds.sort(), ["PER-MP-DG-BUK-A", "PER-MP-DG-DALSEONG"].sort());
-  assert.deepEqual(item.apiMeta.daeguCoProposerNames.sort(), ["우재준", "추경호"].sort());
+  assert.deepEqual(item.personIds.sort(), ["PER-MP-DG-BUK-A", "PER-MP-DG-DALSEONG-2026-LJS"].sort());
+  assert.deepEqual(item.apiMeta.daeguCoProposerNames.sort(), ["우재준", "이진숙"].sort());
   assert.deepEqual(item.apiMeta.leadProposerNames, ["비대구대표"]);
-  assert.ok(item.summary.includes("우재준·추경호"));
+  assert.ok(item.summary.includes("우재준·이진숙"));
   assert.equal(item.apiMeta.reverseScan, true);
 });
 

@@ -1,5 +1,10 @@
-process.env.SUNEUM_ASSEMBLY_API_KEY = process.env.SUNEUM_ASSEMBLY_API_KEY || "sample";
 process.env.SUNEUM_COLLECTOR_PORT = process.env.SUNEUM_COLLECTOR_PORT || "3227";
+
+const apiKey = String(process.env.SUNEUM_ASSEMBLY_API_KEY || "").trim();
+if (!apiKey || apiKey.toLowerCase() === "sample") {
+  console.error("[ERROR] A valid issued Open Assembly API key is required for this diagnostic.");
+  process.exit(2);
+}
 
 const { createCollectorServer, HOST, PORT, SERVICE_VERSION } = await import("./server.mjs");
 const baseUrl = `http://${HOST}:${PORT}`;
@@ -37,7 +42,7 @@ try {
   console.log(`  target members  : ${health.members ?? "-"}`);
   console.log(`  bill scope      : ${health.billScope || "-"}`);
 
-  console.log("[3/3] Calling Open Assembly sample sync");
+  console.log("[3/3] Calling Open Assembly with issued key");
   const sync = await readJson("/api/assembly/sync?days=30");
   console.log(`  queried members : ${sync.queriedMembers ?? "-"}`);
   console.log(`  successful      : ${sync.successfulMembers ?? "-"}`);
@@ -50,8 +55,8 @@ try {
   }
 
   console.log("");
-  console.log("[SUCCESS] Local collector and Open Assembly request path are working.");
-  console.log("The sample key may return limited data. Use an issued key for completeness checks.");
+  console.log("[SUCCESS] Issued-key access to the Open Assembly API is working.");
+  console.log("API key value was not printed or saved by this diagnostic.");
 } catch (error) {
   console.error("");
   console.error(`[FAILED] ${error.message}`);

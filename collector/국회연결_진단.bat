@@ -8,9 +8,17 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-echo Starting SUNEUM SOOJIP Assembly API diagnostic...
+where powershell >nul 2>nul
+if errorlevel 1 (
+  echo [ERROR] Windows PowerShell is required.
+  pause
+  exit /b 1
+)
+echo SUNEUM SOOJIP Assembly API diagnostic
+echo A valid issued Open Assembly API key is required.
+echo The key is entered securely and is not saved to a file.
 echo.
-node "%~dp0assembly-diagnostic.mjs"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0run-issued-key-diagnostic.ps1"
 set "EXIT_CODE=%ERRORLEVEL%"
 echo.
 if "%EXIT_CODE%"=="0" (

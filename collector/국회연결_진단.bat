@@ -1,15 +1,22 @@
 @echo off
+setlocal
 chcp 65001 >nul
-title 선이음-秀集 국회 API 연결 진단
+title SUNEUM SOOJIP Assembly API Diagnostic
 where node >nul 2>nul
 if errorlevel 1 (
-  echo [실행 불가] Node.js 18 이상이 필요합니다.
+  echo [ERROR] Node.js 18 or later is required.
   pause
   exit /b 1
 )
-echo 선이음-秀集 국회 API 연결 상태를 진단합니다.
-echo 정식 인증키를 사용하지 않으며 sample 키로 연결 경로만 확인합니다.
+echo Starting SUNEUM SOOJIP Assembly API diagnostic...
 echo.
-node "%~dp0국회연결_진단.mjs"
+node "%~dp0assembly-diagnostic.mjs"
+set "EXIT_CODE=%ERRORLEVEL%"
 echo.
+if "%EXIT_CODE%"=="0" (
+  echo [OK] Diagnostic finished.
+) else (
+  echo [ERROR] Diagnostic failed. Copy this window output and send it to ChatGPT.
+)
 pause
+exit /b %EXIT_CODE%

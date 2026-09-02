@@ -1,11 +1,13 @@
 import http from "node:http";
 import { pathToFileURL } from "node:url";
 
-export const SERVICE_VERSION = "0.3.2";
+export const SERVICE_VERSION = "0.3.3";
 export const HOST = "127.0.0.1";
 export const PORT = Number.parseInt(process.env.SUNEUM_COLLECTOR_PORT || "3217", 10);
 export const ASSEMBLY_ENDPOINT = "nzmimeepazxkubdpn";
+export const BILL_PROPOSERS_ENDPOINT = "BILLINFOPPSR";
 export const ASSEMBLY_URL = `https://open.assembly.go.kr/portal/openapi/${ASSEMBLY_ENDPOINT}`;
+export const BILL_PROPOSERS_URL = `https://open.assembly.go.kr/portal/openapi/${BILL_PROPOSERS_ENDPOINT}`;
 
 export const DAEGU_MEMBERS = [
   { id: "PER-MP-DG-JUNG-NAM", name: "김기웅", regionIds: ["DAEGU-JUNG", "DAEGU-NAM"], regions: ["대구광역시 중구", "대구광역시 남구"] },
@@ -56,12 +58,10 @@ function isEmptyResultCode(code) {
   return code === "INFO-200" || code === "DATA-000";
 }
 
-export function parseAssemblyPayload(payload) {
-  const bucket = payload?.[ASSEMBLY_ENDPOINT];
+export function parseOpenAssemblyPayload(payload, endpoint) {
+  const bucket = payload?.[endpoint];
   const rootResult = payload?.RESULT;
 
-  // 열린국회정보는 검색 결과가 없을 때 간혹
-  // { RESULT: { CODE: "INFO-200", MESSAGE: ... } } 형식만 반환한다.
   if (!Array.isArray(bucket) && rootResult && typeof rootResult === "object") {
     const code = cleanText(rootResult.CODE);
     const message = cleanText(rootResult.MESSAGE);
@@ -71,7 +71,7 @@ export function parseAssemblyPayload(payload) {
     throw new Error(message ? `열린국회정보 오류(${code || "UNKNOWN"}): ${message}` : `열린국회정보 오류(${code || "UNKNOWN"})`);
   }
 
-  if (!Array.isArray(bucket)) throw new Error("열린국회정보 응답 형식을 확인할 수 없습니다.");
+  if (!Array.isArray(bucket)) throw new Error(`열린국회정보 ${endpoint} 응답 형식을 확인할 수 없습니다.`);
   const head = bucket.flatMap((part) => Array.isArray(part?.head) ? part.head : []);
   const result = head.find((entry) => entry?.RESULT)?.RESULT || {};
   const code = cleanText(result.CODE);
@@ -84,6 +84,14 @@ export function parseAssemblyPayload(payload) {
   const rows = bucket.flatMap((part) => Array.isArray(part?.row) ? part.row : []);
   const total = Number(head.find((entry) => Number.isFinite(Number(entry?.list_total_count)))?.list_total_count || rows.length);
   return { rows, total, resultCode: code || "INFO-000", responseShape: "endpoint" };
+}
+
+export function parseAssemblyPayload(payload) {
+  return parseOpenAssemblyPayload(payload, ASSEMBLY_ENDPOINT);
+}
+
+export function parseBillProposersPayload(payload) {
+  return parseOpenAssemblyPayload(payload, BILL_PROPOSERS_ENDPOINT);
 }
 
 function proposerText(row) {
@@ -99,6 +107,53 @@ function isRepresentative(row, memberName) {
   const representative = cleanText(row.RST_PROPOSER).replace(/\s/g, "");
   const proposer = cleanText(row.PROPOSER).replace(/\s/g, "");
   return representative.includes(compactName) || proposer.startsWith(compactName);
+}
+
+export function normalizeBillProposers(rows) {
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    name: cleanText(row.PPSR_NM),
+    party: cleanText(row.PPSR_POLY_NM),
+    representative: cleanText(row.REP_DIV).includes("대표"),
+    representativeLabel: cleanText(row.REP_DIV),
+    role: cleanText(row.PPSR_ROLE),
+    kind: cleanText(row.PPSR_KIND),
+    memberCode: cleanText(row.NASS_CD),
+    assembly: cleanText(row.ERACO),
+    proposerNo: cleanText(row.PPSR_CN)
+  })).filter((entry) => entry.name);
+}
+
+export function enrichAssemblyItemWithProposers(item, detail) {
+  const proposers = Array.isArray(detail?.proposers) ? detail.proposers : [];
+  const lead = proposers.filter((entry) => entry.representative);
+  const co = proposers.filter((entry) => !entry.representative);
+  const daeguCo = co.filter((entry) => DAEGU_MEMBERS.some((member) => member.name === entry.name));
+  const excerptNames = co.slice(0, 8).map((entry) => entry.name);
+  const extraCount = Math.max(0, co.length - excerptNames.length);
+  const coExcerpt = excerptNames.length
+    ? `공동발의 ${excerptNames.join("·")}${extraCount ? ` 외 ${extraCount}명` : ""}`
+    : "공동발의자 확인 없음";
+  const proposerSummary = `의안 제안자정보에서 전체 제안자 ${proposers.length}명(대표발의 ${lead.length}명·공동발의 ${co.length}명)을 확인함.`;
+
+  return {
+    ...item,
+    rawExcerpt: `${item.rawExcerpt} · ${coExcerpt}`,
+    summary: `${item.summary} ${proposerSummary}`,
+    verificationStatus: "API응답+제안자정보",
+    apiMeta: {
+      ...item.apiMeta,
+      proposerEndpoint: BILL_PROPOSERS_ENDPOINT,
+      proposerCount: proposers.length,
+      leadProposerCount: lead.length,
+      coProposerCount: co.length,
+      leadProposerNames: lead.map((entry) => entry.name),
+      coProposerNames: co.map((entry) => entry.name),
+      daeguCoProposerIds: daeguCo.map((entry) => DAEGU_MEMBERS.find((member) => member.name === entry.name)?.id).filter(Boolean),
+      daeguCoProposerNames: daeguCo.map((entry) => entry.name),
+      proposerListTruncated: Boolean(detail?.possiblyTruncated),
+      proposers
+    }
+  };
 }
 
 export function normalizeAssemblyRows(memberResults, collectedAt = new Date().toISOString()) {
@@ -243,6 +298,33 @@ async function fetchMemberBills(member, apiKey, pageSize) {
   return value;
 }
 
+async function fetchBillProposers(billId, apiKey) {
+  const cacheKey = `bill-proposers:${billId}`;
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.savedAt < 30 * 60 * 1000) return { ...cached.value, cached: true };
+
+  const params = new URLSearchParams({
+    KEY: apiKey,
+    Type: "json",
+    pIndex: "1",
+    pSize: "100",
+    BILL_ID: billId
+  });
+  const response = await fetchWithTimeout(`${BILL_PROPOSERS_URL}?${params.toString()}`);
+  if (!response.ok) throw new Error(`BILLINFOPPSR HTTP ${response.status}`);
+  const parsed = parseBillProposersPayload(await response.json());
+  const proposers = normalizeBillProposers(parsed.rows);
+  const value = {
+    billId,
+    proposers,
+    total: parsed.total,
+    possiblyTruncated: parsed.total > proposers.length || proposers.length >= 100,
+    cached: false
+  };
+  cache.set(cacheKey, { savedAt: Date.now(), value });
+  return value;
+}
+
 async function mapConcurrent(values, limit, mapper) {
   const results = new Array(values.length);
   let cursor = 0;
@@ -269,21 +351,54 @@ async function syncAssemblyBills(apiKey, days) {
 
   const since = new Date(Date.now() - days * 86400000);
   since.setHours(0, 0, 0, 0);
-  const normalized = normalizeAssemblyRows(successes).filter((item) => !item.publishedAt || new Date(item.publishedAt) >= since);
+  const representativeItems = normalizeAssemblyRows(successes).filter((item) => !item.publishedAt || new Date(item.publishedAt) >= since);
+
+  const proposerSettled = await mapConcurrent(representativeItems, 3, async (item) => {
+    const billId = cleanText(item.apiMeta?.billId);
+    if (!billId) throw new Error("BILL_ID가 없어 제안자정보를 조회할 수 없습니다.");
+    const detail = await fetchBillProposers(billId, apiKey);
+    return { item: enrichAssemblyItemWithProposers(item, detail), detail };
+  });
+  const enrichedById = new Map();
+  const proposerDetails = [];
+  const proposerLookupFailures = [];
+  proposerSettled.forEach((result, index) => {
+    const sourceItem = representativeItems[index];
+    if (result.status === "fulfilled") {
+      enrichedById.set(sourceItem.id, result.value.item);
+      proposerDetails.push(result.value.detail);
+    } else {
+      proposerLookupFailures.push({
+        itemId: sourceItem.id,
+        billId: cleanText(sourceItem.apiMeta?.billId),
+        billNo: cleanText(sourceItem.apiMeta?.billNo),
+        title: sourceItem.title,
+        message: cleanText(result.reason?.message) || "제안자정보 수집 실패"
+      });
+    }
+  });
+  const items = representativeItems.map((item) => enrichedById.get(item.id) || item);
+  const proposerListTruncatedBills = proposerDetails.filter((detail) => detail.possiblyTruncated).map((detail) => detail.billId);
+
   return {
     serviceVersion: SERVICE_VERSION,
     fetchedAt: new Date().toISOString(),
     apiMode: sampleMode ? "sample" : "issued-key",
-    scope: "representative-bills",
+    scope: "representative-bills+proposer-details",
     rangeDays: days,
     queriedMembers: DAEGU_MEMBERS.length,
     successfulMembers: successes.length,
     failedMembers: failures,
-    partial: failures.length > 0,
-    items: normalized,
+    proposerEndpoint: BILL_PROPOSERS_ENDPOINT,
+    proposerRequestedBills: representativeItems.length,
+    proposerEnrichedBills: proposerDetails.length,
+    proposerLookupFailures,
+    proposerListTruncatedBills,
+    partial: failures.length > 0 || proposerLookupFailures.length > 0,
+    items,
     notice: sampleMode
-      ? "sample 키는 응답 건수가 제한됩니다. 연결 확인용으로 사용하고, 전체 대표발의 법안 동기화에는 열린국회정보에서 발급한 인증키가 필요합니다."
-      : "정식 인증키로 대구 국회의원 대표발의 법률안을 조회했습니다. 공동발의 목록은 별도 제안자 API 연결 후 제공하며, 모든 자료는 원문 확인 후 사용하세요."
+      ? "sample 키는 실사용 대상이 아닙니다. 전체 대표발의 및 제안자정보 동기화에는 열린국회정보에서 발급한 인증키가 필요합니다."
+      : "정식 인증키로 대구 국회의원 대표발의 법률안과 각 의안의 제안자정보를 조회했습니다. 현재 공동발의 조회는 대구 의원 대표발의 법안의 상세 제안자 명단을 보강하는 범위이며, 다른 의원 법안에 대한 대구 의원 공동발의 역검색은 후속 확장 대상입니다. 모든 자료는 원문 확인 후 사용하세요."
   };
 }
 
@@ -310,7 +425,8 @@ export function createCollectorServer() {
         version: SERVICE_VERSION,
         apiMode: apiKey === "sample" ? "sample" : "issued-key",
         members: DAEGU_MEMBERS.length,
-        billScope: "representative",
+        billScope: "representative+proposer-detail",
+        proposerEndpoint: BILL_PROPOSERS_ENDPOINT,
         startedAt,
         cacheEntries: cache.size
       });
@@ -341,7 +457,8 @@ export function startCollectorServer() {
     console.log(`선이음-秀集 국회 연결기 v${SERVICE_VERSION}`);
     console.log(`상태: http://${HOST}:${PORT}/health`);
     console.log(`인증: ${mode} · API 키 값은 표시하거나 저장하지 않습니다.`);
-    console.log("수집 범위: 대구 국회의원 대표발의 법률안 · 공동발의는 후속 연결 대상입니다.");
+    console.log("수집 범위: 대구 국회의원 대표발의 법률안 + BILLINFOPPSR 제안자 상세");
+    console.log("다른 의원 법안에 대한 대구 의원 공동발의 역검색은 후속 확장 대상입니다.");
     console.log("이 창을 닫으면 국회 자동수집 연결이 종료됩니다.");
   });
   return server;

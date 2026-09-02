@@ -1,9 +1,64 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
-import { DAEGU_MEMBERS, normalizeAssemblyRows, parseAssemblyPayload } from "../server.mjs";
+import {
+  DAEGU_MEMBERS,
+  enrichAssemblyItemWithProposers,
+  normalizeAssemblyRows,
+  normalizeBillProposers,
+  parseAssemblyPayload,
+  parseBillProposersPayload
+} from "../server.mjs";
 
 const fixture = JSON.parse(fs.readFileSync(new URL("../assembly-bills.example.json", import.meta.url), "utf8"));
+
+const proposerFixture = {
+  BILLINFOPPSR: [
+    {
+      head: [
+        { list_total_count: 3 },
+        { RESULT: { CODE: "INFO-000", MESSAGE: "정상" } }
+      ]
+    },
+    {
+      row: [
+        {
+          BILL_ID: "PRC_TEST",
+          PPSR_NM: "김기웅",
+          PPSR_POLY_NM: "국민의힘",
+          REP_DIV: "대표발의",
+          PPSR_ROLE: "발의자",
+          PPSR_KIND: "의원",
+          NASS_CD: "MP001",
+          ERACO: "22",
+          PPSR_CN: "1"
+        },
+        {
+          BILL_ID: "PRC_TEST",
+          PPSR_NM: "최은석",
+          PPSR_POLY_NM: "국민의힘",
+          REP_DIV: "",
+          PPSR_ROLE: "발의자",
+          PPSR_KIND: "의원",
+          NASS_CD: "MP002",
+          ERACO: "22",
+          PPSR_CN: "2"
+        },
+        {
+          BILL_ID: "PRC_TEST",
+          PPSR_NM: "홍길동",
+          PPSR_POLY_NM: "가상정당",
+          REP_DIV: "",
+          PPSR_ROLE: "발의자",
+          PPSR_KIND: "의원",
+          NASS_CD: "MP003",
+          ERACO: "22",
+          PPSR_CN: "3"
+        }
+      ]
+    }
+  ]
+};
 
 test("열린국회정보 응답에서 행을 추출한다", () => {
   const parsed = parseAssemblyPayload(fixture);
@@ -59,4 +114,34 @@ test("정식키의 PROPOSER 검색 결과는 대표발의 검색조건으로 취
   assert.equal(items.length, 1);
   assert.equal(items[0].type, "법안 대표발의");
   assert.ok(items[0].apiMeta.matchBasis.includes("API 대표발의자 검색조건"));
+});
+
+test("BILLINFOPPSR 응답에서 대표발의자와 공동발의자를 구분한다", () => {
+  const parsed = parseBillProposersPayload(proposerFixture);
+  assert.equal(parsed.total, 3);
+  const proposers = normalizeBillProposers(parsed.rows);
+  assert.equal(proposers.length, 3);
+  assert.equal(proposers.filter((entry) => entry.representative).length, 1);
+  assert.equal(proposers.filter((entry) => !entry.representative).length, 2);
+  assert.equal(proposers[0].name, "김기웅");
+  assert.equal(proposers[1].party, "국민의힘");
+});
+
+test("대표발의 법안에 공동발의자 상세와 대구 공동발의자 정보를 보강한다", () => {
+  const member = DAEGU_MEMBERS.find((entry) => entry.name === "김기웅");
+  const baseItem = normalizeAssemblyRows([
+    { member, rows: parseAssemblyPayload(fixture).rows, trustSearchFilter: false }
+  ], "2026-09-02T00:00:00.000Z")[0];
+  const detail = {
+    proposers: normalizeBillProposers(parseBillProposersPayload(proposerFixture).rows),
+    possiblyTruncated: false
+  };
+  const enriched = enrichAssemblyItemWithProposers(baseItem, detail);
+  assert.equal(enriched.verificationStatus, "API응답+제안자정보");
+  assert.equal(enriched.apiMeta.proposerCount, 3);
+  assert.equal(enriched.apiMeta.leadProposerCount, 1);
+  assert.equal(enriched.apiMeta.coProposerCount, 2);
+  assert.deepEqual(enriched.apiMeta.daeguCoProposerNames, ["최은석"]);
+  assert.ok(enriched.rawExcerpt.includes("공동발의 최은석·홍길동"));
+  assert.ok(enriched.summary.includes("공동발의 2명"));
 });

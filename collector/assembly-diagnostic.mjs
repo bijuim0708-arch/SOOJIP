@@ -43,6 +43,8 @@ try {
   console.log(`  bill scope      : ${health.billScope || "-"}`);
   console.log(`  proposer API    : ${health.proposerEndpoint || "-"}`);
   console.log(`  reverse endpoint: ${health.reverseScanEndpoint || "-"}`);
+  console.log(`  reverse page size: ${health.reverseScanPageSize ?? "-"}`);
+  console.log(`  reverse page limit: ${health.reverseScanPageLimit ?? "-"}`);
 
   console.log("[3/4] Checking representative bills and proposer enrichment");
   const sync = await readJson("/api/assembly/sync?days=30");
@@ -71,6 +73,7 @@ try {
 
   console.log("[4/4] Checking Daegu co-sponsor reverse scan");
   const reverse = await readJson("/api/assembly/cosponsors?days=30");
+  console.log(`  assembly page size: ${reverse.assemblyPageSize ?? "-"}`);
   console.log(`  assembly pages  : ${reverse.assemblyPagesFetched ?? "-"}`);
   console.log(`  assembly total  : ${reverse.assemblyBillsTotal ?? "-"}`);
   console.log(`  recent candidates: ${reverse.recentCandidateBills ?? "-"}`);
